@@ -5,52 +5,71 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-import os
-from sqlalchemy import create_engine
-import pandas as pd
-from dotenv import load_dotenv
-
-# Load environment variables from .env file
-load_dotenv()
-
-# Fetch database credentials from environment variables
-db_user = os.getenv('DB_USER')
-db_password = os.getenv('DB_PASSWORD')
-db_host = os.getenv('DB_HOST')
-db_name = os.getenv('DB_NAME')
-
-# Step 1: Create the connection string
-connection_string = f"postgresql://{db_user}:{db_password}@{db_host}/{db_name}"
-
-# Step 2: Create an engine and connect to the database
+connection_string = f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}/{os.getenv('DB_NAME')}"
 engine = create_engine(connection_string).execution_options(autocommit=True)
-connection = engine.connect()
+engine.connect()
 
-# Step 3: Create a table (if not exists)
-create_table_query = """
-CREATE TABLE IF NOT EXISTS employees (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(100),
-    position VARCHAR(100),
-    salary NUMERIC
+engine.execute("""
+CREATE TABLE IF NOT EXISTS categories(
+    category_id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL
 );
-"""
-connection.execute(create_table_query)
 
-# Step 4: Insert some data into the table
-insert_data_query = """
-INSERT INTO employees (name, position, salary)
-VALUES 
-    ('Dustin Pedroia', 'Data Scientist', 90000),
-    ('David Ortiz', 'Data Analyst', 80000),
-    ('Manny Ramirez', 'Software Engineer', 95000)
-ON CONFLICT DO NOTHING;
-"""
-connection.execute(insert_data_query)
+CREATE TABLE IF NOT EXISTS products(
+    product_id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    price DECIMAL(10, 2) NOT NULL,
+    category_id INT,
+    FOREIGN KEY(category_id) REFERENCES categories(category_id)
+);
 
-# Step 5: Use pandas to fetch and display data from the table
-df = pd.read_sql('SELECT * FROM employees', connection)
-print(df)
+CREATE TABLE IF NOT EXISTS customers(
+    customer_id SERIAL PRIMARY KEY,
+    first_name VARCHAR(100),
+    last_name VARCHAR(100),
+    email VARCHAR(255) UNIQUE
+);
 
-# Close the connection after operations are done
-connection.close()
+CREATE TABLE IF NOT EXISTS orders(
+    order_id SERIAL PRIMARY KEY,
+    order_date DATE NOT NULL,
+    customer_id INT,
+    FOREIGN KEY(customer_id) REFERENCES customers(customer_id)
+);
+
+CREATE TABLE IF NOT EXISTS order_items(
+    order_item_id SERIAL PRIMARY KEY,
+    order_id INT,
+    product_id INT,
+    quantity INT NOT NULL,
+    FOREIGN KEY(order_id) REFERENCES orders(order_id) ON DELETE CASCADE,
+    FOREIGN KEY(product_id) REFERENCES products(product_id) ON DELETE CASCADE
+);
+""")
+
+engine.execute("""
+INSERT INTO categories (name) VALUES ('Electronics'), ('Books'), ('Clothing'), ('Toys');
+INSERT INTO products (name, price, category_id) VALUES 
+    ('Laptop', 1200.00, 1),
+    ('Smartphone', 800.00, 1),
+    ('Fiction Book', 15.00, 2),
+    ('T-Shirt', 20.00, 3),
+    ('Action Figure', 25.00, 4);
+
+INSERT INTO customers (first_name, last_name, email) VALUES 
+    ('John', 'Doe', 'johndoe@example.com'),
+    ('Jane', 'Smith', 'janesmith@example.com');
+
+INSERT INTO orders (order_date, customer_id) VALUES 
+    ('2024-10-01', 1),
+    ('2024-10-02', 2);
+
+INSERT INTO order_items (order_id, product_id, quantity) VALUES 
+    (1, 1, 1),
+    (1, 3, 2),
+    (2, 2, 1),
+    (2, 4, 1);
+""")
+
+result_dataFrame = pd.read_sql("SELECT * FROM customers;", engine)
+print(result_dataFrame)
